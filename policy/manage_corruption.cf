@@ -1,0 +1,63 @@
+bundle agent rpmd_manage_corruption
+# @brief Keep the RPM database working
+# @description Sometimes the RPM database gets corrupt and causes errors when
+# working with the package manager. A common first step is to clear locks in
+# the rpm directory and rebuild the database.
+# If this does not suffice the following urls may prove useful.
+# * http://www.oldrpm.org/hintskinks/repairdb/
+# * http://www.sharp-tools.net/archives/000765.html
+# * http://www.rpm.org/wiki/Docs/RpmRecovery
+{
+  vars:
+    redhat|centos::
+      "rpm_db_location" string => "/var/lib/rpm";
+      "rpmdb_lock_files" slist => findfiles("$(rpm_db_location)/__db.*");
+
+      "rpmdb_test_command"
+        string => "/bin/rpm --quiet -q kernel",
+        comment => "We have to run rpm in order to see if its working, we test
+                    a package that we always know will be installed, the
+                    kernel";
+
+      "corruption"
+        string => ifelse("corrupt_rpm_db", "True", "False")
+        meta =>  { "inventory", "attribute_name=RPM DB Corruption" };
+
+    DEBUG|DEBUG_rpmd_manage_corruption::
+      "classes" slist => classesmatching("rpmdb_lock_file.*");
+
+  classes:
+    redhat|centos::
+      "corrupt_rpm_db"
+         not => returnszero( $(rpmdb_test_command) , noshell);
+
+  files:
+    corrupt_rpm_db::
+      "$(rpmdb_lock_files)"
+        delete => tidy,
+        handle => "remove_corrupt_rpmdb_lock_file_$(rpmdb_lock_files)",
+        comment => "Removing $(rpmdb_lock_files) because the rpm database was found to be corrupt",
+        classes => scoped_classes_generic("bundle", "rpmdb_lock_file_$(rpmdb_lock_files)_corruption");
+
+  commands:
+    redhat|centos::
+      "/bin/rpm"
+        args => "--rebuilddb",
+        comment => "Rebuilding the rpmdb because one or more rpmdb files were repaired",
+        ifvarclass => classmatch("rpm_db_file_.*_corruption_repaired");
+
+  reports:
+    !(redhat|centos)::
+      "$(this.bundle) only supports redhat and centos hosts";
+
+    DEBUG|DEBUG_rpmd_manage_corruption::
+      "DEBUG $(this.bundle): Found rpm db lock file: $(rpmdb_lock_files)";
+
+      "DEBUG $(this.bundle): Detected corrupt RPM DB"
+        ifvarclass => "corrupt_rpm_db";
+
+      "DEBUG $(this.bundle): RPM Database appears OK"
+        ifvarclass => "!corrupt_rpm_db";
+
+      "DEBUG $(this.bundle): Defined $(classes)";
+}

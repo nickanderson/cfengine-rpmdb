@@ -1,0 +1,56 @@
+* RPMDB
+
+Policy to help manage and maintain your rpm database.
+
+** rpmdb_manage_corruption
+
+The most common repair to rpm errors is cleaning up lock files. When
+this policy detects an error while querying the rpm packge database it
+cleans up the lock files and rebuilds the database.
+
+** How to integrate into your policy
+
+First get the policy into your masterfiles
+
+#+begin_src sh
+  cd /tmp
+  export MASTERFILES=/home/nickanderson/CFEngine/masterfiles
+  git clone https://github.com/nickanderson/cfengine-rpmdb.git
+  cd cfengine-rpmdb
+  mkdir -p $MASTERFILES/services/rpmdb
+  git archive master | tar -x -C $MASTERFILES/services/rpmdb
+#+end_src
+
+
+Include def.cf in your inputs
+
+#+begin_src cfengine
+  body common control
+  {
+        inputs => {
+                    # Reports
+                    @(cfengine_reports.inputs),
+
+                   "services/rpmdb/def.cf",
+
+                    # autorun system
+                    @(services_autorun.inputs),
+        };
+  }
+#+end_src
+
+I would reccomend using def.json if your running 3.7 or greater
+masterfiles
+
+** Activating the policy
+
+
+#+begin_src cfengine
+  bundle agent main
+  {
+    methods:
+      redhat|centos::
+        "Mantain RPM DB"
+          usebundle => rpmdb_manage_corruption;
+  }
+#+end_src

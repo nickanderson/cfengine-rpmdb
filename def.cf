@@ -1,0 +1,8 @@
+body file control
+{
+  inputs => {
+              "$(sys.libdir)/common.cf",
+              "$(sys.libdir)/files.cf",
+              "policy/manage_corruption.cf",
+            };
+}
